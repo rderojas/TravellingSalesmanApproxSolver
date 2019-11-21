@@ -1,0 +1,11 @@
+50.in
+number of nodes: 45
+percentage cover: 0.3
+
+100.in
+number of nodes: 90
+percentage cover: 0.25
+
+200.in
+number of nodes: 180
+percentage cover: 0.25

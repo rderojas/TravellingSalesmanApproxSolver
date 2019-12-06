@@ -4,7 +4,13 @@ sys.path.append('..')
 sys.path.append('../..')
 import argparse
 import utils
-
+import networkx as nx
+import matplotlib.pyplot as plt
+import random as rand
+import numpy as np
+import math
+from student_utils import*
+from utils import*
 from student_utils import *
 """
 ======================================================================
@@ -13,19 +19,126 @@ from student_utils import *
 """
 
 def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix, params=[]):
-    """
-    Write your algorithm here.
-    Input:
-        list_of_locations: A list of locations such that node i of the graph corresponds to name at index i of the list
-        list_of_homes: A list of homes
-        starting_car_location: The name of the starting location for the car
-        adjacency_matrix: The adjacency matrix from the input file
-    Output:
-        A list of locations representing the car path
-        A dictionary mapping drop-off location to a list of homes of TAs that got off at that particular location
-        NOTE: both outputs should be in terms of indices not the names of the locations themselves
-    """
-    pass
+    
+    home_indices = convert_locations_to_indices(list_of_homes,list_of_locations)
+    start_index = convert_locations_to_indices([starting_car_location],list_of_locations)[0]
+    G = adjacency_matrix_to_graph(adjacency_matrix)[0]
+    carPath,dropoffs = solverTrialAndError(G,home_indices,start_index,10)
+    finaldropoffs = {}
+    for dLoc in dropoffs:
+        if len(dropoffs[dLoc]) > 0:
+            finaldropoffs[dLoc] = dropoffs[dLoc]
+    for dLoc in finaldropoffs:
+        finaldropoffs[dLoc] = list(set(finaldropoffs[dLoc]))
+    return carPath, finaldropoffs
+
+
+
+"""
+Helper functions for the project
+"""
+
+#graph solver function
+def solverDijkstraChoices(G,home_indices_master,start_index,choices):
+    def pathLength(dest): return nx.dijkstra_path_length(G,currLoc,dest)
+    home_indices = home_indices_master[:]
+    dropoffs= {}
+    currLoc = start_index
+    carPath = []
+    prevLoc = None
+    pathToClosest = None
+    returning = False
+    while len(home_indices) > 0:
+        #Find closest home
+        closestHomes = closestNeighbors(G,currLoc,home_indices,choices)
+        closest = closestHomes[rand.randint(0,len(closestHomes)-1)]
+        intermediate = chokepoint(G,prevLoc,currLoc,closest,carPath,pathToClosest)
+        if intermediate is not None:
+            pathToClosest = rectifyPath(G,carPath,intermediate,currLoc,closest,dropoffs)
+        else:
+            pathToClosest = nx.dijkstra_path(G,currLoc, closest)
+        carPath.extend(pathToClosest)
+        carPath.pop()
+        prevLoc = currLoc
+        currLoc = closest
+        if currLoc in home_indices_master:
+            if currLoc in dropoffs:
+                dropoffs[currLoc].append(currLoc)
+            else:
+                dropoffs[currLoc] = [currLoc]
+        home_indices.remove(closest)
+        if (len(home_indices) <= 0) and not returning:
+            home_indices.append(start_index)
+            returning=True
+    carPath.append(start_index)
+    return carPath, dropoffs
+
+def chokepoint(G,prevLoc,currLoc,nextLoc,carPath,pathToCurr):
+    if prevLoc == None or pathToCurr == None:
+        return
+    prevToCurr = pathToCurr
+    currToNext = nx.dijkstra_path(G,currLoc, nextLoc)
+    for v in prevToCurr:
+        intermediate = nx.dijkstra_path(G,v, currLoc)
+        if set(intermediate) <= set(currToNext) and len(intermediate) > 1:
+            return intermediate[0]
+
+        
+def rectifyPath(G,carPath,intermediate,currLoc,nextLoc,dropoffs):
+    intStart = intermediate
+    dropoffs[currLoc].remove(currLoc)
+    if intStart in dropoffs:
+        dropoffs[intStart].append(currLoc)
+    else:
+        dropoffs[intStart] = [currLoc]
+    dropoffLoc = carPath.pop()
+    while dropoffLoc != intStart:
+        dropoffLoc = carPath.pop()
+    return nx.dijkstra_path(G,intermediate,nextLoc)
+    
+    
+
+def solverTrialAndError(G,home_indices_master,start_index,iters):
+    home_indices = home_indices_master[:]
+    dropoffs = {}
+    currLoc = start_index
+    carPath = []
+    minPath,minDropoffs = solverDijkstraChoices(G,home_indices,start_index,1)
+    minCost = cost_of_solution(G,minPath,minDropoffs)[0]
+    #Trial and error solver
+    prevLoc = None;
+    pathToClosest = None;
+    for _ in range(iters):
+        carPath,dropoffs = solverDijkstraChoices(G,home_indices,start_index,3)
+        currCost = cost_of_solution(G,carPath,dropoffs)[0]
+        if type(minCost) == type(currCost) and minCost > currCost:
+                minPath = carPath
+                minDropoffs = dropoffs
+        dropoffs = {}
+        carPath = []
+        home_indices = home_indices_master[:]
+        currLoc = start_index
+        prevLoc = None;
+        pathToClosest = None;
+    return minPath,minDropoffs
+        
+        
+        
+def closestNeighbors(G,currLoc,home_indices,numNeighbors):
+    #minKey Lambda
+    def pathLength(dest): 
+        return nx.dijkstra_path_length(G,currLoc,dest)
+    home_indices_temp = home_indices[:]
+    closest = []
+    for _ in range(numNeighbors):
+        currClosest = min(home_indices_temp,key=pathLength)
+        closest.append(currClosest)
+        home_indices_temp.remove(currClosest)
+        if len(home_indices_temp) ==0:
+            break
+    return closest
+
+
 
 """
 ======================================================================

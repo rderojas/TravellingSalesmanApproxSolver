@@ -19,11 +19,10 @@ from student_utils import *
 """
 
 def solve(list_of_locations, list_of_homes, starting_car_location, adjacency_matrix, params=[]):
-    
     home_indices = convert_locations_to_indices(list_of_homes,list_of_locations)
     start_index = convert_locations_to_indices([starting_car_location],list_of_locations)[0]
     G = adjacency_matrix_to_graph(adjacency_matrix)[0]
-    carPath,dropoffs = solverTrialAndError(G,home_indices,start_index,10)
+    carPath,dropoffs = solverTrialAndError(G,home_indices,start_index,100)
     finaldropoffs = {}
     for dLoc in dropoffs:
         if len(dropoffs[dLoc]) > 0:
@@ -51,7 +50,7 @@ def solverDijkstraChoices(G,home_indices_master,start_index,choices):
     while len(home_indices) > 0:
         #Find closest home
         closestHomes = closestNeighbors(G,currLoc,home_indices,choices)
-        closest = closestHomes[rand.randint(0,len(closestHomes)-1)]
+        closest = chooseClosest(G,currLoc,closestHomes)
         intermediate = chokepoint(G,prevLoc,currLoc,closest,carPath,pathToClosest)
         if intermediate is not None:
             pathToClosest = rectifyPath(G,carPath,intermediate,currLoc,closest,dropoffs)
@@ -109,7 +108,7 @@ def solverTrialAndError(G,home_indices_master,start_index,iters):
     prevLoc = None;
     pathToClosest = None;
     for _ in range(iters):
-        carPath,dropoffs = solverDijkstraChoices(G,home_indices,start_index,3)
+        carPath,dropoffs = solverDijkstraChoices(G,home_indices,start_index,4)
         currCost = cost_of_solution(G,carPath,dropoffs)[0]
         if type(minCost) == type(currCost) and minCost > currCost:
                 minPath = carPath
@@ -121,9 +120,26 @@ def solverTrialAndError(G,home_indices_master,start_index,iters):
         prevLoc = None;
         pathToClosest = None;
     return minPath,minDropoffs
+
+
+def chooseClosest(G,currLoc,candidates):
+    #make weights for each candidate
+    weights = {}
+    totalWeight = 0
+    if len(candidates) == 1:
+        return candidates[0]
+    if currLoc in candidates:
+        return currLoc
+    for v in candidates:
+        currWeight = 1/(nx.dijkstra_path_length(G,currLoc,v))
+        weights[v] = currWeight
+        totalWeight += currWeight
+    probList = []
+    for v in candidates:
+        probList.append(weights[v]/totalWeight)
+    return np.random.choice(candidates,p=probList)
         
-        
-        
+           
 def closestNeighbors(G,currLoc,home_indices,numNeighbors):
     #minKey Lambda
     def pathLength(dest): 
@@ -137,7 +153,6 @@ def closestNeighbors(G,currLoc,home_indices,numNeighbors):
         if len(home_indices_temp) ==0:
             break
     return closest
-
 
 
 """

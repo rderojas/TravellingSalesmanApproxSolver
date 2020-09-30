@@ -1,2 +1,6 @@
-# project-fa19
-CS 170 Fall 2019 Project
+# Travelling Salesman Approximate Solver
+
+Problem Statement:
+https://cs170.org/assets/project/spec.pdf
+
+Solution Explanation:
